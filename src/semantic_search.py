@@ -1,144 +1,35 @@
 from __future__ import annotations
-from datetime import datetime
-from typing import Any, Dict, List, Optional
 import json
-
-# Standardizer:
-def normalize_log(raw):
-    #standardize ID:
-    log_id = raw.get("log_id", raw.get("id"))
-
-    #Convert unix to stand time
-    timestamp_raw = raw.get("timestamp")
-    if timestamp_raw:
-        timestamp = datetime.fromtimestamp(int(timestamp_raw))
-    else:
-        timestamp = None
-    
-    #Standardize notes/details/blanks
-    notes = raw.get("notes") or raw.get("details") or ""
-
-    #Base fields:
-    subject = raw.get("subject", "")
-    category = raw.get("category", "")
-    level = raw.get("level", "")
-
-    #Split categories/ levels into parsable inputs:
-    categories = []
-    if category:
-        category_options = category.split(",")
-        for c in category_options:
-            cleaned = c.strip().lower()
-            categories.append(cleaned)
-    
-    if level:
-        level = level.lower()
-    
-   
-    return {
-    "log_id": log_id,
-    "timestamp": timestamp,
-    "category": category,
-    "categories": categories,
-    "level": level,
-    "subject": subject,
-    "notes": notes
-   }
+from typing import List
+from sentence_transformers import SentenceTransformer
+from search import *
+import math
 
 
 
-#Base search function
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
-def search_logs(
-    query: str, 
-    logs: list, 
-    start_time: Optional[datetime] = None, 
-    end_time: Optional[datetime] = None, 
-    category: Optional[str] = None,
-    level: Optional[str] =None,
-    k: int = 3
-):
-    #Basic filtering POC
-    output = logs
+def embed_text(text: str):
+    try:
+        return model.encode(text)
+    except Exception as e:
+        print(f"[Embedding Error] Failed to embed text: {text[:50]}")
+        raise e
 
-    if start_time is not None:
-        filtered_logs = []
-        for log in output:
-            if log["timestamp"] >= start_time:
-                filtered_logs.append(log)
-        output = filtered_logs
-    
-    if end_time is not None:
-        filtered_logs = []
-        for log in output:
-            if log["timestamp"] <= end_time:
-                filtered_logs.append(log)
-        output = filtered_logs
-    
-    if category is not None:
-        filtered_logs = []
-        for log in output:
-            if category.strip().lower() in log["categories"]:
-                filtered_logs.append(log)
-        output = filtered_logs
+def cosine_similarity(vec1, vec2):
+    dot_product = 0
+    norm1 = 0
+    norm2 = 0
 
-    if level is not None:
-        filtered_logs = []
-        level_norm = level.strip().lower()
-        for log in output:
-            if log["level"] == level_norm:
-                filtered_logs.append(log)
-        output = filtered_logs
-    
-    # Basic Ranking POC
-    query_terms = query.lower().split()
-    scored_logs =[]
+    for i in range(len(vec1)):
+        dot_product += vec1[i] * vec2[i]
+        norm1 += vec1[i] * vec1[i]
+        norm2 += vec2[i] * vec2[i]
 
-    for log in output:
-        text = (log["subject"]+ " " + log["notes"]).lower()
-        match = 0
-        for t in query_terms: 
-            if t in text:
-                match +=1
-        scored_logs.append((match,log))
-    
-    #Sort logs by score and extracked them
-    scored_logs.sort(reverse=True, key=lambda item: item[0])
-    ranked_logs =[]
-    for score, content in scored_logs:
-        ranked_logs.append(content)
-    
-    #Removing 0 match logs
-    non_zero_ranked = []
-    for score,log in scored_logs:
-        if score>0:
-            non_zero_ranked.append(log)
-    ranked_logs = non_zero_ranked
+    if norm1 == 0 or norm2 == 0:
+        return 0
 
-    #Limiting return to desired K amount
-    most_relevant_logs =[]
-    count = 0
-
-    for log in ranked_logs:
-        if count >= k:
-            break
-        most_relevant_logs.append(log)
-        count+=1
-       
-    
-    #Format results 
-    formatted_output =[]
-    for log in most_relevant_logs:
-        formatted_log = {
-            "log_id": log["log_id"],
-            "timestamp": log["timestamp"],
-            "category": log["category"],
-            "level": log["level"],
-            "subject": log["subject"],
-            "note_excerpt": log["notes"][:300]
-        }
-        formatted_output.append(formatted_log)
-    return formatted_output
+    return dot_product / (math.sqrt(norm1) * math.sqrt(norm2))
 
 
 if __name__ == "__main__":
@@ -150,21 +41,21 @@ if __name__ == "__main__":
             raw_log = json.loads(line)
             normalized_log = normalize_log(raw_log)
             logs.append(normalized_log)
+
+    texts = []
+    for log in logs:
+        text = log["subject"] + " " + log["notes"]
+        texts.append(text)
+
+    embeddings = model.encode(texts)
+
+    for i in range(len(logs)):
+        logs[i]["embedding"] = embeddings[i]
+
+    print(len(logs[0]["embedding"]))
     
-
-    print(logs[0]["categories"])
-
-    #test:
-    results = search_logs(
-    query="vacuum issue",
-    logs=logs,
-    category="vacuum",
-    k=3
-)
-      
-        
-
-    
-
-
-
+    query = "vacuum issue"
+    query_embedding = embed_text(query)
+    print(len(query_embedding)) 
+    score = cosine_similarity(query_embedding, logs[0]["embedding"])
+    print(score)
