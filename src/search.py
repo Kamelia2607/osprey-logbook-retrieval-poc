@@ -1,6 +1,49 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import json
+
+# Standardizer:
+def normalize_log(raw):
+    #standardize ID:
+    log_id = raw.get("log_id", raw.get("id"))
+
+    #Convert unix to stand time
+    timestamp_raw = raw.get("timestamp")
+    if timestamp_raw:
+        timestamp = datetime.fromtimestamp(int(timestamp_raw))
+    else:
+        timestamp = None
+    
+    #Standardize notes/details/blanks
+    notes = raw.get("notes") or raw.get("details") or ""
+
+    #Base fields:
+    subject = raw.get("subject", "")
+    category = raw.get("category", "")
+    level = raw.get("level", "")
+
+    #Split categories/ levels into parsable inputs:
+    categories = []
+    if category:
+        category_options = category.split(",")
+        for c in category_options:
+            cleaned = c.strip().lower()
+            categories.append(cleaned)
+    
+    if level:
+        level = level.lower()
+    
+   
+    return {
+    "log_id": log_id,
+    "timestamp": timestamp,
+    "category": category,
+    "categories": categories,
+    "level": level,
+    "subject": subject,
+    "notes": notes
+   }
 
 
 
@@ -35,14 +78,15 @@ def search_logs(
     if category is not None:
         filtered_logs = []
         for log in output:
-            if log["category"] == category:
+            if category.strip().lower() in log["categories"]:
                 filtered_logs.append(log)
         output = filtered_logs
 
     if level is not None:
         filtered_logs = []
+        level_norm = level.strip().lower()
         for log in output:
-            if log["level"] == level:
+            if log["level"] == level_norm:
                 filtered_logs.append(log)
         output = filtered_logs
     
@@ -98,24 +142,27 @@ def search_logs(
 
 
 if __name__ == "__main__":
-    from mock_data import mock_logs
+    path = "../logbook_250226_anonymized_2024plus (1).jsonl"
+    logs = []
 
-    mock_output = search_logs(
-        query="Has there been any vaccum instability",
-        logs = mock_logs,
-        start_time=datetime(2026,2,19),
-        k=2
-    )
-    for log in mock_output:
-        print(f"Log ID: {log['log_id']}")
-        print(f"Time: {log['timestamp']}")
-        print(f"Category: {log['category']}")
-        print(f"Level: {log['level']}")
-        print(f"Subject: {log['subject']}")
-        print(f"Notes: {log['note_excerpt']}")
-        print()
-
+    with open(path) as f:
+        for line in f:
+            raw_log = json.loads(line)
+            normalized_log = normalize_log(raw_log)
+            logs.append(normalized_log)
     
+
+    print(logs[0]["categories"])
+
+    #test:
+    results = search_logs(
+    query="vacuum issue",
+    logs=logs,
+    category="vacuum",
+    k=3
+)
+      
+        
 
     
 
