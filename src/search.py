@@ -34,6 +34,8 @@ def normalize_log(raw):
     if level:
         level = level.lower()
     
+    search_text = f"{subject} {notes}".strip()
+        
    
     return {
     "log_id": log_id,
@@ -42,7 +44,9 @@ def normalize_log(raw):
     "categories": categories,
     "level": level,
     "subject": subject,
-    "notes": notes
+    "notes": notes,
+    "search_text": search_text
+    
    }
 
 
@@ -155,12 +159,8 @@ if __name__ == "__main__":
     print(logs[0]["categories"])
 
     #test:
-    results = search_logs(
-    query="vacuum issue",
-    logs=logs,
-    category="vacuum",
-    k=3
-)
+    print(logs[0]["search_text"])
+
       
         
 

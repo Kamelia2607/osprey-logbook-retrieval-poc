@@ -31,6 +31,78 @@ def cosine_similarity(vec1, vec2):
 
     return dot_product / (math.sqrt(norm1) * math.sqrt(norm2))
 
+def semantic_search(user_query, 
+logs,
+start_time=None,
+end_time=None,
+category=None,
+level=None, 
+k=3,):
+    output = logs
+
+    if start_time is not None:
+        filtered_logs = []
+        for log in output:
+            if log["timestamp"] >= start_time:
+                filtered_logs.append(log)
+        output = filtered_logs
+
+    if end_time is not None:
+        filtered_logs = []
+        for log in output:
+            if log["timestamp"] <= end_time:
+                filtered_logs.append(log)
+        output = filtered_logs
+
+    if category is not None:
+        filtered_logs = []
+        category_norm = category.strip().lower()
+        for log in output:
+            if category_norm in log["categories"]:
+                filtered_logs.append(log)
+        output = filtered_logs
+
+    if level is not None:
+        filtered_logs = []
+        level_norm = level.strip().lower()
+        for log in output:
+            if log["level"] == level_norm:
+                filtered_logs.append(log)
+        output = filtered_logs
+
+    query_embedding = embed_text(user_query)
+    scored_logs = []
+
+    for log in output:
+        score = cosine_similarity(query_embedding, log["embedding"])
+        scored_logs.append((score, log))
+
+    scored_logs.sort(reverse=True, key=lambda item: item[0])
+
+    formatted_output = []
+    count = 0
+
+    for score, log in scored_logs:
+        if count >= k:
+            break
+
+        formatted_log = {
+            "score": score,
+            "log_id": log["log_id"],
+            "timestamp": log["timestamp"],
+            "category": log["category"],
+            "level": log["level"],
+            "subject": log["subject"],
+            "note_excerpt": log["notes"][:300]
+        }
+
+        formatted_output.append(formatted_log)
+        count += 1
+
+    return formatted_output
+
+
+
 
 if __name__ == "__main__":
     path = "../logbook_250226_anonymized_2024plus (1).jsonl"
@@ -51,11 +123,18 @@ if __name__ == "__main__":
 
     for i in range(len(logs)):
         logs[i]["embedding"] = embeddings[i]
-
-    print(len(logs[0]["embedding"]))
     
-    query = "vacuum issue"
-    query_embedding = embed_text(query)
-    print(len(query_embedding)) 
-    score = cosine_similarity(query_embedding, logs[0]["embedding"])
-    print(score)
+    results = semantic_search(
+    user_query="beam issue",
+    logs=logs,
+    category="vacuum",
+    k=3
+)
+
+    for log in results:
+        print(log["score"])
+        print(log["subject"])
+        print(log["category"])
+        print()
+        
+   
