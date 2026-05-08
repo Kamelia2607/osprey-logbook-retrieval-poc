@@ -1,6 +1,7 @@
 from openai import OpenAI
 
-client = OpenAI()
+#PUT YOUR KEY IN HERE:
+client = OpenAI(api_key="")
 
 
 def summarize_logs(user_query, retrieved_logs):
@@ -12,6 +13,7 @@ def summarize_logs(user_query, retrieved_logs):
         "Keep the response concise and operator-friendly.\n\n"
         f"Operator query:\n{user_query}\n\n"
         "Retrieved logs:\n"
+        "Do not use markdown formatting (no bold, no asterisks). Return plain text."
     )
 
     for log in retrieved_logs:
