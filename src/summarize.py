@@ -1,7 +1,7 @@
 from openai import OpenAI
 
 #PUT YOUR KEY IN HERE:
-client = OpenAI(api_key="")
+client = OpenAI(api_key="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")
 
 
 def summarize_logs(user_query, retrieved_logs):
